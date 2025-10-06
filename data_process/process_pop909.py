@@ -5,7 +5,6 @@ import shutil
 from typing import List, Dict, Tuple, Set
 
 import miditoolkit
-from music21 import converter
 from tqdm import tqdm
 
 # (major, minor, diminished, augmented, sus2, sus4)

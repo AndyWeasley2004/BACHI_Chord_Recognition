@@ -1,0 +1,14 @@
+# Core dependencies
+torch
+numpy
+pyyaml
+
+# Data processing
+music21
+miditoolkit
+
+# Utilities
+tqdm
+requests
+pandas
+
