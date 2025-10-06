@@ -1,0 +1,57 @@
+require "debug"
+require "allegro"
+require "mfread"
+
+# save all the note messages in chords track, documenting both 
+# seconds and beats
+
+
+file_name = command_line_arguments[1]
+
+def get_file_path_idx(name):
+    for i = len(name)-1 to 0 by -1
+        if name[i] == "/"
+            return i+1
+
+file_path = subseq(file_name, 0, get_file_path_idx(file_name))
+
+seq = allegro_smf_read(file_name)
+if not seq
+    print "Could not read", file_name
+    exit()
+
+# convert seq times to sec
+seq.convert_to_seconds()
+times = []
+for track at tr in seq.tracks
+    for note in track
+        if isinstance(note, Alg_note)
+            times.append(note.time) 
+
+# convert seq times to beats
+seq.convert_to_beats()
+beats = []
+for track at tr in seq.tracks
+    for note in track
+        if isinstance(note, Alg_note)
+            beats.append(note.time) 
+
+timestamps = []
+for t at idx in times:
+    timestamps.append([t, beats[idx]])
+
+def time_increase(a, b):
+    return a[0] > b[0]
+timestamps.sort('time_increase')
+
+f = open(strcat(file_path, "timestamps.txt"), "w")
+for x in timestamps
+    f.write(str(x[0]) + " " + str(x[1]) + "\n")
+f.close()
+
+# each tuple contains a correspondance [seconds, beats]
+# print timestamps_1
+
+exit()
+
+
