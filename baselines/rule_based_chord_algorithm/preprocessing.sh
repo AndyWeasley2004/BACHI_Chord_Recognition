@@ -1,6 +1,6 @@
 #! /bin/bash
 
-input_root="rule_based_evaluation/pop909_test"
+input_root="../rule_based_evaluation/pop909_test"
 find "$input_root" -mindepth 1 -maxdepth 1 -type d -print0 | while IFS= read -r -d '' sub; do
     base=$(basename "$sub")
     mid_file="$sub/${base}.mid"
