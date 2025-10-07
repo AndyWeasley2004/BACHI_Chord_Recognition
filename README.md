@@ -1,25 +1,72 @@
 # BACHI: Boundary-Aware Symbolic Chord Recognition Through Masked Iterative Decoding
 
-[![Paper](https://img.shields.io/badge/Paper-ICASSP%202026-blue)](https://andyweasley2004.github.io/BACHI/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
 Official implementation of **BACHI** (Boundary-Aware Symbolic Chord Recognition Through Masked Iterative Decoding), a state-of-the-art model for automatic chord recognition from symbolic music scores.
 
-## Installation
+[Paper]() | [Demo Page](https://andyweasley2004.github.io/BACHI.github.io/) | [POP909-CL Dataset](https://github.com/AndyWeasley2004/POP909-CL-Dataset) | [Model Weight & Data](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition)
+
+## Environment
 
 ### Requirements
 - Python 3.8+
 - PyTorch 2.0+
 - CUDA (optional, for GPU acceleration)
 
-### Setup
-
 ```bash
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Data Processing
+
+## Quick Start
+
+Use the provided inference script to predict chords for new music scores with pre-trained checkpoints below:
+
+- **Classical Model**: Trained on When-in-Rome + DCML corpus; [checkpoint](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition/tree/main/classical_film_kdec)
+- **Pop Model**: Trained on POP909-CL; [checkpoint](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition/tree/main/pop909_film_kdec)
+
+### Single File Inference
+
+```bash
+python inference.py \
+    --input /path/to/score \
+    --output predictions/ \
+    --checkpoint_dir /path/to/checkpoint_directory
+```
+
+### Group Inference by Folder
+
+```bash
+python inference.py \
+    --input /path/to/scores_directory/ \
+    --output predictions/ \
+    --checkpoint_dir /path/to/checkpoint_directory
+```
+
+The `--checkpoint_dir` should point to a directory containing:
+- `best_model.pt` (model checkpoint)
+- `config.yaml` (model configuration)
+- Vocabulary file (path specified in config)
+
+**Supported formats**: `.musicxml`, `.mxl`, `.xml`, `.mid`, `.midi`
+
+### Output Format
+
+Predictions are saved as text files with the format.
+```
+0.00 C_M_C
+2.50 F_M_F
+4.00 G_M_G
+6.50 C_M_C
+```
+
+Each line represents a chord change with:
+- Beat position (in quarter notes)
+- Root note
+- Quality (M=major, m=minor, D7=dominant 7th, etc.)
+- Bass note (for inversions)
+
+
+## Train your own model
+### Data Process
 
 BACHI requires symbolic music scores to be converted into piano roll representations with aligned chord labels. The data processing pipeline consists of several stages:
 
@@ -48,14 +95,16 @@ python data_process/build_gross_dataset.py \
     --harmony-type quality
 ```
 
+For quick download our processed data, please visit [here](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition/tree/main/unique_data_collection)
+
 #### Pop Music (POP909-CL)
 
-POP909 has MIDI support only.
+Please refer to the release repository of [POP909-CL](https://github.com/AndyWeasley2004/POP909-CL-Dataset) for dataset details. For quick start, you can use the following script for quick extraction of chord labels.
 
 ```bash
 # Process POP909 to organized format
 python data_process/process_pop909.py \
-    --pop909-root POP909_chord_annotated \
+    --pop909-root POP909_processed \
     --out data_root/all_data_collection
 ```
 
@@ -125,81 +174,15 @@ This will:
 bash run_all_ablation_eval.sh {data-name}
 ```
 
-## Inference
-
-Use the provided inference script to predict chords for new music scores:
-
-### Single File
-
-```bash
-python inference.py \
-    --input /path/to/score \
-    --output predictions/ \
-    --checkpoint_dir /path/to/checkpoint_directory
-```
-
-### Directory of Files
-
-```bash
-python inference.py \
-    --input /path/to/scores_directory/ \
-    --output predictions/ \
-    --checkpoint_dir /path/to/checkpoint_directory
-```
-
-The `--checkpoint_dir` should point to a directory containing:
-- `best_model.pt` (model checkpoint)
-- `config.yaml` (model configuration)
-- Vocabulary file (path specified in config)
-
-**Supported formats**: `.musicxml`, `.mxl`, `.xml`, `.mid`, `.midi`
-
-### Output Format
-
-Predictions are saved as text files with the format.
-```
-0.00 C_M_C
-2.50 F_M_F
-4.00 G_M_G
-6.50 C_M_C
-```
-
-Each line represents a chord change with:
-- Beat position (in quarter notes)
-- Root note
-- Quality (M=major, m=minor, D7=dominant 7th, etc.)
-- Bass note (for inversions)
-
-## Model Checkpoints
-
-Pre-trained model checkpoints will be available for download:
-
-- **Classical Model**: Trained on When-in-Rome + DCML corpus
-- **Pop Model**: Trained on POP909-CL
-
-[Download links will be provided upon publication]
-
 ## POP909-CL Dataset
 
 POP909-CL is an enhanced version of POP909 with human-corrected annotations:
-
-### Key Improvements
-- ✅ 40.6% of misaligned start beats corrected
-- ✅ 14.2% of missing key signature changes added
-- ✅ 2.6% of incorrect time signatures fixed
-- ✅ ~35% of chord label errors corrected
-
-### Statistics
-- **Total tracks**: 909 Chinese pop songs
-- **Format**: MIDI with aligned annotations
-- **Annotations**: Chords, beats, keys, time signatures
-- **Quality**: Professionally reviewed and corrected
 
 [Dataset download link will be provided upon publication]
 
 ## Baselines
 
-The `baselines/` directory contains implementations and evaluation scripts for comparison methods. Detailed documentation will be added for each baseline.
+The `baselines/` directory contains implementations and evaluation scripts for comparison methods. Detailed documentation lies inside each model inside `baselines/`
 
 ## Citation
 
@@ -208,8 +191,8 @@ If you use BACHI or POP909-CL in your research, please cite:
 ```bibtex
 @inproceedings{yao2026bachi,
   title={BACHI: Boundary-Aware Symbolic Chord Recognition Through Masked Iterative Decoding on Pop and Classical Music},
-  author={Mingyang Yao and Ke Chen and Dubnov, Shlomo and Berg-Kirkpatrick, Taylor},
-  booktitle={IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  author={Mingyang Yao and Ke Chen and Shlomo Dubnov and Taylor Berg-Kirkpatrick},
+  booktitle={arxiv},
   year={2025}
 }
 ```
@@ -217,17 +200,3 @@ If you use BACHI or POP909-CL in your research, please cite:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- When-in-Rome corpus by Mark Gotham
-- DCML corpus by the Digital and Cognitive Musicology Lab
-- POP909 dataset by the Music X Lab
-- Professional musicians who contributed to POP909-CL annotations
-
-## Contact
-
-For questions or issues, please:
-- Open an issue on GitHub
-- Visit our [project page](https://andyweasley2004.github.io/BACHI/)
-- Contact: [your-email@ucsd.edu]

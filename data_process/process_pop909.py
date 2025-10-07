@@ -184,7 +184,7 @@ def process_pop909(
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Build the stage-1 gross dataset from POP909.")
     p.add_argument(
-        "--pop909-root", type=Path, default=Path("POP909_chord_annotated")
+        "--pop909-root", type=Path, default=Path("POP909_processed")
     )
     p.add_argument("--out", type=Path, default=Path("data_root/all_data_collection"))
     args = p.parse_args()
