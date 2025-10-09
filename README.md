@@ -2,7 +2,7 @@
 
 Official implementation of **BACHI** (Boundary-Aware Symbolic Chord Recognition Through Masked Iterative Decoding), a state-of-the-art model for automatic chord recognition from symbolic music scores.
 
-[Paper](https://arxiv.org/pdf/2510.06528) | [Demo Page](https://andyweasley2004.github.io/BACHI/) | [POP909-CL Dataset](https://github.com/AndyWeasley2004/POP909-CL-Dataset) | [Model Weight & Data](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition)
+[Paper](https://arxiv.org/abs/2510.06528) | [Demo Page](https://andyweasley2004.github.io/BACHI/) | [POP909-CL Dataset](https://github.com/AndyWeasley2004/POP909-CL-Dataset) | [Model Weight & Data](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition)
 
 ## Environment
 
