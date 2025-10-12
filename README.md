@@ -44,7 +44,7 @@ python inference.py \
 The `--checkpoint_dir` should point to a directory containing:
 - `best_model.pt` (model checkpoint)
 - `config.yaml` (model configuration)
-- Vocabulary file (path specified in config)
+- Vocabulary file (already contained in checkpoint folders for [hugging face](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition))
 
 **Supported formats**: `.musicxml`, `.mxl`, `.xml`, `.mid`, `.midi`
 
