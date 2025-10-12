@@ -212,7 +212,7 @@ def main():
     if not checkpoint_dir.exists():
         print(f"Error: Checkpoint directory '{checkpoint_dir}' does not exist.")
         sys.exit(1)
-    
+
     # Load config from checkpoint directory
     config_path = checkpoint_dir / 'config.yaml'
     if not config_path.exists():
@@ -221,14 +221,14 @@ def main():
     
     with open(config_path, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
-    
+
     # Setup device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
-    
+
     # Load vocabs - use the vocab_path from config
-    vocab_path = Path(config['training']['vocab_path'])
-    if not vocab_path.exists():
+    vocab_path = os.path.join(checkpoint_dir, 'vocab.pkl')
+    if not os.path.exists(vocab_path):
         print(f"Error: Vocabulary file '{vocab_path}' not found.")
         sys.exit(1)
     
@@ -237,7 +237,7 @@ def main():
     # Determine experiment and key usage
     experiment = config['experiment']
     use_key = bool(config.get('use_key', False)) or bool(config['training'].get('use_key', False)) or bool(config['model'].get('use_key', False))
-    
+
     # Build and load model
     checkpoint_path = checkpoint_dir / 'best_model.pt'
     if not checkpoint_path.exists():
