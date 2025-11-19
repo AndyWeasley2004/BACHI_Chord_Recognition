@@ -23,13 +23,15 @@ Use the provided inference script to predict chords for new music scores with pr
 - **Classical Model**: Trained on When-in-Rome + DCML corpus; [checkpoint](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition/tree/main/classical_film_kdec)
 - **Pop Model**: Trained on POP909-CL; [checkpoint](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition/tree/main/pop909_film_kdec)
 
+**Note:** The model is trained on piano data only and only supports pitch ranges of piano (21-108) on MIDI.
+
 ### Single File Inference
 
 ```bash
-python inference.py \
-    --input /path/to/score \
-    --output predictions/ \
-    --checkpoint_dir /path/to/checkpoint_directory
+python inference.py 
+--input path/to/score
+--output path/to/save 
+--checkpoint_dir path/to/model
 ```
 
 ### Group Inference by Folder
@@ -39,6 +41,7 @@ python inference.py \
     --input /path/to/scores_directory/ \
     --output predictions/ \
     --checkpoint_dir /path/to/checkpoint_directory
+    --num_workers 4
 ```
 
 The `--checkpoint_dir` should point to a directory containing:

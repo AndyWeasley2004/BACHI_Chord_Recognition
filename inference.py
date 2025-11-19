@@ -3,7 +3,8 @@ import sys
 import argparse
 import math
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple, Optional
+import multiprocessing
 
 import yaml
 import torch
@@ -11,14 +12,15 @@ import numpy as np
 import miditoolkit
 from music21 import converter, note as m21_note, chord as m21_chord
 from torch.amp import autocast
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from dataset import load_vocabs
 from models.variants import build_model
 
 
-def extract_pianoroll(score_path: Path, resolution: int = 12) -> np.ndarray:
-    """Extract piano roll from a music score file.
+def extract_pianoroll(score_path: Path, resolution: int = 12) -> Optional[np.ndarray]:
+    """Extract piano roll from a music score file, excluding drum/percussion tracks.
     
     Args:
         score_path: Path to the music score file
@@ -36,6 +38,10 @@ def extract_pianoroll(score_path: Path, resolution: int = 12) -> np.ndarray:
             midi = miditoolkit.MidiFile(str(score_path))
             tpb = midi.ticks_per_beat or 480
             for inst in midi.instruments:
+                # Exclude drum tracks
+                if inst.is_drum:
+                    continue
+                    
                 for n in inst.notes:
                     start_qb = n.start / tpb
                     end_qb = n.end / tpb
@@ -43,16 +49,36 @@ def extract_pianoroll(score_path: Path, resolution: int = 12) -> np.ndarray:
         else:
             # MusicXML/MXL file processing
             sc = converter.parse(str(score_path))
-            sc.makeVoices(inPlace=True)
-            for el in sc.flat.notes:
-                dur = float(el.quarterLength)
-                start_qb = float(el.offset)
-                end_qb = start_qb + dur
-                if isinstance(el, m21_note.Note):
-                    notes_data.append((el.pitch.midi, start_qb, end_qb))
-                elif isinstance(el, m21_chord.Chord):
-                    for p in el.pitches:
-                        notes_data.append((p.midi, start_qb, end_qb))
+            
+            # Handle parts to detect instruments
+            if sc.hasPartLikeStreams():
+                parts = list(sc.parts)
+            else:
+                parts = [sc]
+                
+            for part in parts:
+                # Check instrument for percussion
+                inst = part.getInstrument()
+                if inst:
+                    # Check classes
+                    classes = inst.classes if hasattr(inst, 'classes') else []
+                    if 'Percussion' in classes or 'Unpitched' in classes:
+                        continue
+                    # Check name as fallback
+                    name = inst.bestName if hasattr(inst, 'bestName') else ''
+                    if name and ('drum' in name.lower() or 'percussion' in name.lower()):
+                        continue
+                
+                # Extract notes from this part
+                for el in part.flat.notes:
+                    dur = float(el.quarterLength)
+                    start_qb = float(el.offset)
+                    end_qb = start_qb + dur
+                    if isinstance(el, m21_note.Note):
+                        notes_data.append((el.pitch.midi, start_qb, end_qb))
+                    elif isinstance(el, m21_chord.Chord):
+                        for p in el.pitches:
+                            notes_data.append((p.midi, start_qb, end_qb))
         
         if not notes_data:
             return None
@@ -77,29 +103,43 @@ def extract_pianoroll(score_path: Path, resolution: int = 12) -> np.ndarray:
         return pianoroll
     
     except Exception as e:
+        # We print error here but returning None is handled by caller
         print(f"Error extracting pianoroll from {score_path.name}: {e}")
         return None
 
 
-def process_single_file(
-    score_path: Path,
+class MusicScoreDataset(Dataset):
+    """Dataset for parallel loading and extraction of pianorolls."""
+    def __init__(self, file_paths: List[Path], resolution: int):
+        self.file_paths = file_paths
+        self.resolution = resolution
+
+    def __len__(self):
+        return len(self.file_paths)
+
+    def __getitem__(self, idx):
+        path = self.file_paths[idx]
+        # Returns (path_str, pianoroll_or_None)
+        # We return path as string because Path objects pickle fine but string is safer/simpler across processes
+        pr = extract_pianoroll(path, self.resolution)
+        return str(path), pr
+
+
+def collate_scores(batch):
+    """Simple collate function that returns the list of items."""
+    return batch
+
+
+def predict_piece(
+    pianoroll: torch.Tensor,
     model,
     config: Dict[str, Any],
     vocabs: Dict[str, Any],
     device: torch.device,
     use_key: bool,
-) -> str:
-    """Process a single music score file and return prediction string."""
+) -> Optional[str]:
+    """Run inference on a single pianoroll tensor and return prediction string."""
     
-    # Extract pianoroll from score
-    resolution = config['model']['beat_resolution']
-    pianoroll = extract_pianoroll(score_path, resolution)
-    
-    if pianoroll is None:
-        return None
-    
-    # Convert to torch tensor
-    pianoroll = torch.from_numpy(pianoroll.T).float()
     n_frames = pianoroll.shape[0]
     
     # Inference parameters
@@ -127,22 +167,37 @@ def process_single_file(
     
     # Run inference on each segment
     piece_preds = {k: [] for k in comps_eval + ['boundary']}
-    for i in range(len(segments)):
-        segment_batch = segments[i].unsqueeze(0).to(device)
-        mask_batch = masks[i].unsqueeze(0).to(device)
+    
+    # Batch segments for GPU efficiency?
+    # The original code processed segments one by one in a loop, but added unsqueeze(0).
+    # We can stack them if there are many segments, but for now let's keep logic simple
+    # or stack them into a batch.
+    
+    # Stack segments to run in one go (or batches of segments)
+    # Depending on piece length, this could be large. Let's use a batch size of 16 segments.
+    segment_batch_size = 16
+    
+    for i in range(0, len(segments), segment_batch_size):
+        batch_segs = torch.stack(segments[i : i + segment_batch_size]).to(device)
+        batch_masks = torch.stack(masks[i : i + segment_batch_size]).to(device)
+        
         with autocast(device_type=device.type, dtype=torch.bfloat16, enabled=True):
-            out = model.forward_infer(segment_batch, src_key_padding_mask=~mask_batch)
+            out = model.forward_infer(batch_segs, src_key_padding_mask=~batch_masks)
+            
         for k in comps_eval + ['boundary']:
             if k in out:
+                # Move to CPU immediately
                 piece_preds[k].append(out[k].detach().cpu())
-    
+
     # Aggregate predictions
     n_target_frames = int(math.ceil(n_frames / pr_to_label_ratio))
     piece_pred_ids = {}
-    for k, parts in piece_preds.items():
-        if not parts:
+    for k, parts_list in piece_preds.items():
+        if not parts_list:
             continue
-        cat = torch.cat([p.reshape(-1) for p in parts], dim=0)
+        # parts_list is a list of tensors (B, Len) or (B, Len, ...)
+        # Flatten the batch dimension
+        cat = torch.cat([p.reshape(-1) for p in parts_list], dim=0)
         if k == 'boundary':
             piece_pred_ids[k] = cat[:n_target_frames]
         else:
@@ -193,11 +248,13 @@ def process_single_file(
 def main():
     parser = argparse.ArgumentParser(description='BACHI Chord Recognition Inference')
     parser.add_argument('--input', type=str, required=True,
-                        help='Path to input music score file or directory of score files')
+                        help='Path to input music score file or directory of score files (Pitch range: 21-108)')
     parser.add_argument('--output', type=str, required=True,
                         help='Path to output directory for predictions')
     parser.add_argument('--checkpoint_dir', type=str, required=True,
                         help='Path to checkpoint directory containing best_model.pt, config.yaml, and vocab')
+    parser.add_argument('--num_workers', type=int, default=1,
+                        help='Number of workers for data loading (default: auto-detect)')
     args = parser.parse_args()
     
     # Determine input type
@@ -226,7 +283,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
-    # Load vocabs - use the vocab_path from config
+    # Load vocabs
     vocab_path = os.path.join(checkpoint_dir, 'vocab.pkl')
     if not os.path.exists(vocab_path):
         print(f"Error: Vocabulary file '{vocab_path}' not found.")
@@ -271,34 +328,56 @@ def main():
     # Create output directory
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # Process files
-    print(f"\nProcessing {len(input_files)} file(s)...")
+    # Setup DataLoader
+    num_workers = args.num_workers if args.num_workers is not None else min(8, multiprocessing.cpu_count())
+    print(f"Processing {len(input_files)} file(s) using {num_workers} workers...")
+    
+    dataset = MusicScoreDataset(input_files, config['model']['beat_resolution'])
+    loader = DataLoader(
+        dataset, 
+        batch_size=4,  # Load 4 files at a time (collated as list)
+        shuffle=False, 
+        num_workers=num_workers, 
+        collate_fn=collate_scores
+    )
+    
     successful = 0
     failed = 0
     
     with torch.no_grad():
-        for score_file in tqdm(input_files, desc="Inference"):
-            try:
-                # Run inference
-                prediction_text = process_single_file(
-                    score_file, model, config, vocabs, device, use_key
-                )
+        for batch in tqdm(loader, desc="Inference"):
+            for path_str, pianoroll_np in batch:
+                score_file = Path(path_str)
                 
-                if prediction_text is None:
-                    print(f"\nWarning: Failed to process '{score_file.name}'")
+                if pianoroll_np is None:
+                    print(f"\nWarning: Failed to extract pianoroll from '{score_file.name}'")
                     failed += 1
                     continue
                 
-                # Write output
-                output_file = output_path / f"{score_file.stem}.txt"
-                with open(output_file, 'w') as f:
-                    f.write(prediction_text + '\n')
-                
-                successful += 1
-                
-            except Exception as e:
-                print(f"\nError processing '{score_file.name}': {e}")
-                failed += 1
+                try:
+                    # Convert to tensor
+                    pianoroll = torch.from_numpy(pianoroll_np.T).float()
+                    
+                    # Run inference
+                    prediction_text = predict_piece(
+                        pianoroll, model, config, vocabs, device, use_key
+                    )
+                    
+                    if prediction_text is None:
+                        print(f"\nWarning: Failed to predict for '{score_file.name}' (empty result)")
+                        failed += 1
+                        continue
+                    
+                    # Write output
+                    output_file = output_path / f"{score_file.stem}.txt"
+                    with open(output_file, 'w') as f:
+                        f.write(prediction_text + '\n')
+                    
+                    successful += 1
+                    
+                except Exception as e:
+                    print(f"\nError processing '{score_file.name}': {e}")
+                    failed += 1
     
     # Summary
     print(f"\n{'='*60}")
@@ -311,4 +390,6 @@ def main():
 
 
 if __name__ == '__main__':
+    # Required for multiprocessing on some platforms
+    multiprocessing.set_start_method('spawn', force=True)
     main()
