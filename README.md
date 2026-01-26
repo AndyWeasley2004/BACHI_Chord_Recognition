@@ -194,11 +194,11 @@ The `baselines/` directory contains implementations and evaluation scripts for c
 If you use BACHI or POP909-CL in your research, please cite:
 
 ```bibtex
-@inproceedings{yao2026bachi,
-  title={BACHI: Boundary-Aware Symbolic Chord Recognition Through Masked Iterative Decoding on Pop and Classical Music},
-  author={Mingyang Yao and Ke Chen and Shlomo Dubnov and Taylor Berg-Kirkpatrick},
-  booktitle={arxiv},
-  year={2025}
+@inproceedings{bachi2025,
+    author = {Mingyang Yao, Ke Chen, Shlomo Dubnov, Taylor Berg-Kirkpatrick},
+    title = {BACHI: Boundary-Aware Symbolic Chord Recognition Through Masked Iterative Decoding on Pop and Classical Music},
+    booktitle = {Proceedings of IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+    year = {2026}
 }
 ```
 
