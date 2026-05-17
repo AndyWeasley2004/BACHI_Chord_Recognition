@@ -30,10 +30,10 @@ Use the provided inference script to predict chords for new music scores with pr
 ### Single File Inference
 
 ```bash
-python inference.py 
---input path/to/score
---output path/to/save 
---checkpoint_dir path/to/model
+python inference.py \
+    --input path/to/score \
+    --output path/to/save \
+    --checkpoint_dir path/to/model
 ```
 
 ### Group Inference by Folder
@@ -42,7 +42,7 @@ python inference.py
 python inference.py \
     --input /path/to/scores_directory/ \
     --output predictions/ \
-    --checkpoint_dir /path/to/checkpoint_directory
+    --checkpoint_dir /path/to/checkpoint_directory \
     --num_workers 4
 ```
 
@@ -52,6 +52,8 @@ The `--checkpoint_dir` should point to a directory containing:
 - Vocabulary file (already contained in checkpoint folders for [hugging face](https://huggingface.co/datasets/Itsuki-music/BACHI_Chord_Recognition))
 
 **Supported formats**: `.musicxml`, `.mxl`, `.xml`, `.mid`, `.midi`
+
+**Device**: Auto-selected by default (GPU if available, else CPU). Pass `--device cpu` to force CPU.
 
 ### Output Format
 
