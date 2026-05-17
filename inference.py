@@ -253,8 +253,10 @@ def main():
                         help='Path to output directory for predictions')
     parser.add_argument('--checkpoint_dir', type=str, required=True,
                         help='Path to checkpoint directory containing best_model.pt, config.yaml, and vocab')
-    parser.add_argument('--num_workers', type=int, default=1,
+    parser.add_argument('--num_workers', type=int, default=None,
                         help='Number of workers for data loading (default: auto-detect)')
+    parser.add_argument('--device', type=str, default='auto',
+                        help="Device to run on: 'auto', 'cpu', 'cuda', or e.g. 'cuda:0' (default: auto)")
     args = parser.parse_args()
     
     # Determine input type
@@ -280,7 +282,10 @@ def main():
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     # Setup device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if args.device == 'auto':
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else:
+        device = torch.device(args.device)
     print(f"Using device: {device}")
 
     # Load vocabs
